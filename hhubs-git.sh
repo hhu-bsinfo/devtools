@@ -14,7 +14,7 @@ readonly REMOTE_SHARED="bsinfo"
 readonly GITHUB_SHARED="git@github.com:hhu-bsinfo"
 readonly GITHUB_ORIGIN="git@github.com:$GITHUB_USER"
 
-readonly REPOSITORIES=("cdepl" "dxapp-helloworld" "dxbuild" "dxdevtools" "dxmon" "dxnet" "dxram" "dxterm" "dxterm-client" "dxutils" "ibdxnet")
+readonly REPOSITORIES=("cdepl" "dxapp-helloworld" "dxbuild" "dxdevtools" "dxmon" "dxnet" "dxram" "dxterm" "dxutils" "ibdxnet")
 
 clone_and_setup_repository()
 {
