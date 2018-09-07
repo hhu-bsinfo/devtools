@@ -1,20 +1,24 @@
 #!/bin/bash
 
-####################
-# TWEAK ME
-readonly NAME="Octo Cat"
-readonly EMAIL="octocat@github.com"
-readonly GITHUB_USER="octocat"
+# Create a configuration file with the following contents in the comments and adjust the parameters
+#
+# NAME="Octo Cat"
+# EMAIL="octocat@github.com"
+# GITHUB_USER="octocat"
+# REMOTE_ORIGIN="origin"
+# REMOTE_SHARED="bsinfo"
 
-readonly REMOTE_ORIGIN="origin"
-readonly REMOTE_SHARED="bsinfo"
-# TWEAK ME
-####################
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
+
+# Abort on any errors
+set -e
+
+source ${SCRIPT_DIR}/hhubs-git.conf
 
 readonly GITHUB_SHARED="git@github.com:hhu-bsinfo"
 readonly GITHUB_ORIGIN="git@github.com:$GITHUB_USER"
 
-readonly REPOSITORIES=("cdepl" "dxapp-helloworld" "dxbuild" "dxdevtools" "dxmem" "dxmon" "dxnet" "dxram" "dxterm" "dxutils" "ibdxnet")
+readonly REPOSITORIES=("cdepl"  "dxbuild" "dxdevtools" "dxmem" "dxmon" "dxnet" "dxram" "dxutils" "ibdxnet")
 
 clone_and_setup_repository()
 {
@@ -44,19 +48,55 @@ checkout_branch_repository()
 fetch_and_rebase_hhubs()
 {
     local repo_name=$1
+    local remote_name=$2
+    local branch_name=$3
 
     cd $repo_name
-    git fetch $REMOTE_SHARED
-    git checkout master
-    git rebase $REMOTE_ORIGIN/master
-    git checkout development
-    git rebase $REMOTE_ORIGIN/development
+    git fetch $remote_name
+
+    set +e
+    # Check if branch exists
+    git rev-parse --verify $branch_name > /dev/null
+
+    if [ "$?" = "0" ]; then
+        set -e
+        echo "$branch_name branch..."
+        git checkout $branch_name
+        git rebase $remote_name/$branch_name
+    fi
+
+    set -e
+    
+    cd ..
+}
+
+push_to_remote()
+{
+    local repo_name=$1
+    local remote_name=$2
+    local branch_name=$3
+
+    cd $repo_name
+
+    set +e
+    # Check if branch exists
+    git rev-parse --verify $branch_name > /dev/null
+
+    if [ "$?" = "0" ]; then
+        set -e
+        echo "$branch_name branch..."
+        git checkout $branch_name
+        git push $remote_name HEAD:$branch_name
+    fi
+
+    set -e
+
     cd ..
 }
 
 if [ ! "$1" ]; then
     echo "Git wrapper script to easily batch clone, update or checkout repositories for development"
-    echo "Available commands: clone, update, checkout"
+    echo "Available commands: clone, pull, checkout, push"
     exit -1
 fi
 
@@ -82,13 +122,33 @@ case $1 in
 
         ;;
 
-    update)
+    pull)
+        if [ ! "$2" ]; then
+            echo "Specify the remote to pull from"
+            exit -1
+        fi
+
         for repo in "${REPOSITORIES[@]}"; do
-            echo ">>> Updating $repo..."
-            fetch_and_rebase_hhubs $repo
+            echo ">>> Pull $repo from $2..."
+            fetch_and_rebase_hhubs $repo $2 master
+            fetch_and_rebase_hhubs $repo $2 development
         done
         
         ;;
+
+    push)
+        if [ ! "$2" ]; then
+            echo "Specify the remote to push to"
+            exit -1
+        fi
+
+        for repo in "${REPOSITORIES[@]}"; do
+            echo ">>> Pushing $repo to $2..."
+            push_to_remote $repo $2 master
+            push_to_remote $repo $2 development
+        done
+        
+        ;;  
 
     *)
         echo "Invalid command"
