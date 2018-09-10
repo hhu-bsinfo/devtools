@@ -24,6 +24,11 @@ clone_and_setup_repository()
 {
     local repo_name=$1
 
+    if [ -d "$repo_name" ]; then
+        echo "Skipping existing repo $repo_name"
+        return
+    fi
+
     git clone $GITHUB_SHARED/$repo_name
     cd $repo_name
     git config user.name "$NAME"
