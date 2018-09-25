@@ -10,6 +10,8 @@
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
 
+DXRAM_WORKSPACE_DIR="${SCRIPT_DIR}/.."
+
 # Abort on any errors
 set -e
 
@@ -18,7 +20,7 @@ source ${SCRIPT_DIR}/hhubs-git.conf
 readonly GITHUB_SHARED="git@github.com:hhu-bsinfo"
 readonly GITHUB_ORIGIN="git@github.com:$GITHUB_USER"
 
-readonly REPOSITORIES=("cdepl"  "dxbuild" "dxdevtools" "dxmem" "dxmon" "dxnet" "dxram" "dxutils" "ibdxnet")
+readonly REPOSITORIES=("cdepl" "dxbuild" "dxlog" "dxmem" "dxmon" "dxnet" "dxram" "dxutils" "ibdxnet")
 
 clone_and_setup_repository()
 {
@@ -45,9 +47,8 @@ checkout_branch_repository()
     local repo_name=$1
     local branch=$2
 
-    cd $repo_name
+    cd ${DXRAM_WORKSPACE_DIR}/$repo_name
     git checkout $branch
-    cd ..
 }
 
 fetch_and_rebase_hhubs()
@@ -56,7 +57,7 @@ fetch_and_rebase_hhubs()
     local remote_name=$2
     local branch_name=$3
 
-    cd $repo_name
+    cd ${DXRAM_WORKSPACE_DIR}/$repo_name
     git fetch $remote_name
 
     set +e
@@ -71,8 +72,6 @@ fetch_and_rebase_hhubs()
     fi
 
     set -e
-    
-    cd ..
 }
 
 push_to_remote()
@@ -81,7 +80,7 @@ push_to_remote()
     local remote_name=$2
     local branch_name=$3
 
-    cd $repo_name
+    cd ${DXRAM_WORKSPACE_DIR}/$repo_name
 
     set +e
     # Check if branch exists
@@ -95,8 +94,6 @@ push_to_remote()
     fi
 
     set -e
-
-    cd ..
 }
 
 if [ ! "$1" ]; then
@@ -109,7 +106,11 @@ case $1 in
     clone)
         for repo in "${REPOSITORIES[@]}"; do
             echo ">>> Cloning $repo..."
-            clone_and_setup_repository $repo
+            if [ -d "$repo" ]; then
+                echo "Already exists, skipping"
+            else
+                clone_and_setup_repository $repo
+            fi
         done
 
         ;;
