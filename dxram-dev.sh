@@ -38,7 +38,7 @@ compile_dxapps()
     cd $LOCAL_DXAPPS_DIR
 
     if [ "$clean" = "1" ]; then
-        ./gradlew clean
+        ./build.sh clean
     fi
    
     if [ "$type" ]; then
@@ -81,7 +81,7 @@ compile_dxmem()
     cd $LOCAL_DXMEM_DIR
 
     if [ "$clean" = "1" ]; then
-        ./gradlew clean
+        ./build.sh clean
     fi
    
     if [ "$type" ]; then
@@ -145,7 +145,7 @@ compile_dxnet()
     cd $LOCAL_DXNET_DIR
    
     if [ "$clean" = "1" ]; then
-        ./gradlew clean
+        ./build.sh clean
     fi
 
     if [ "$type" ]; then
@@ -167,7 +167,7 @@ compile_dxram()
     cd $LOCAL_DXRAM_DIR
 
     if [ "$clean" = "1" ]; then
-        ./gradlew clean
+        ./build.sh clean
     fi
    
     if [ "$type" ]; then
