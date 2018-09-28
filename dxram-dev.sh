@@ -108,7 +108,7 @@ compile_ibdxnet()
         ./build.sh $type
     elif [ "$remote" = "hhubs" ]; then
         if [ ! "$node" ]; then
-            echo "Please specify node to compile on (doesn't work on sollipulli)"
+            echo "Please specify the node of hhubs (e.g. node65) to compile on (doesn't work on sollipulli)"
             exit 1
         fi
 
@@ -201,8 +201,32 @@ copy_dxapps()
 
 copy_ycsb()
 {
-    echo "TODO"
-    exit 1
+    local remote="$1"
+    local clean="$2"
+
+    if [ "$remote" = "hhubs" ]; then
+        if [ "$clean" ]; then
+            ssh ${HHUBS_USER}@${HHUBS_HOST} "rm -r ${HHUBS_DIR}/ycsb-dxram"
+        fi
+
+        # ycsb build output
+        cd ${LOCAL_DXRAM_YCSB}/dxram/target/
+        tar -xzvf ycsb-dxram-binding-0.13.0-SNAPSHOT.tar.gz
+        rsync -avz ${LOCAL_DXRAM_YCSB}/dxram/target/ycsb-dxram-binding-0.13.0-SNAPSHOT/ ${HHUBS_USER}@${HHUBS_HOST}:${HHUBS_DIR}/ycsb-dxram/
+        rm -r ycsb-dxram-binding-0.13.0-SNAPSHOT
+
+        # copy dxram to ycsb-dxram folder
+        rsync -avz ${DXRAM_DIST_DIR}/ ${HHUBS_USER}@${HHUBS_HOST}:${HHUBS_DIR}/ycsb-dxram/
+
+        # check if ibdxnet is available and copy
+        if [ "$(ssh ${HHUBS_USER}@${HHUBS_HOST} "[ -d ${HHUBS_DIR}/ibdxnet/build ] && echo \"1\"")" ]; then
+            echo "Found compiled ibdxnet lib, copying to dxram jni folder..."
+            ssh ${HHUBS_USER}@${HHUBS_HOST} "cp ${HHUBS_DIR}/ibdxnet/build/lib/libMsgrcJNIBinding.so ${HHUBS_DIR}/ycsb-dxram/jni/"
+        fi
+    else
+        echo "Invalid remote: $remote"
+        exit 1
+    fi
 }
 
 copy_dxmem()
@@ -265,6 +289,29 @@ depl_dxram()
     esac
 }
 
+depl_ycsb()
+{
+    local remote="$1"
+    local mode="$2"  
+    local args=${@:3}
+
+    cd $LOCAL_CDEPL_DIR
+
+    case $mode in
+        run)
+            ./cdepl.sh scripts/dxram_ycsb.cdepl $args
+            ;;
+
+        kill)
+            ./cdepl.sh scripts/dxram_killall.cdepl $args
+            ;;
+        
+        *)
+            echo "Invalid mode: $mode"
+            exit 1
+    esac
+}
+
 term()
 {
     ${LOCAL_DXAPPS_DIR}/dxa-terminal/client/build/dist/client/bin/client ${@:1}
@@ -281,6 +328,10 @@ depl()
     case $prog in
         dxram)
             depl_dxram $remote $mode ${@:4}
+            ;;
+
+        ycsb)
+            depl_ycsb $remote $mode ${@:4}
             ;;
 
         *)
