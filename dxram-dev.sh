@@ -237,8 +237,27 @@ copy_dxmem()
 
 copy_dxnet()
 {
-    echo "TODO"
-    exit 1
+    local remote="$1"
+    local clean="$2"
+
+    if [ "$remote" = "hhubs" ]; then
+        cd $LOCAL_DXNET_DIR
+
+        if [ "$clean" ]; then
+            ssh ${HHUBS_USER}@${HHUBS_HOST} "rm -r ${HHUBS_DIR}/dxnet"
+        fi
+
+        rsync -avz build/dist/dxnet/ ${HHUBS_USER}@${HHUBS_HOST}:${HHUBS_DIR}/dxnet/
+
+        # check if ibdxnet is available and copy
+        if [ "$(ssh ${HHUBS_USER}@${HHUBS_HOST} "[ -d ${HHUBS_DIR}/ibdxnet/build ] && echo \"1\"")" ]; then
+            echo "Found compiled ibdxnet lib, copying to dxram jni folder..."
+            ssh ${HHUBS_USER}@${HHUBS_HOST} "cp ${HHUBS_DIR}/ibdxnet/build/lib/libMsgrcJNIBinding.so ${HHUBS_DIR}/dxnet/jni/"
+        fi
+    else
+        echo "Invalid remote: $remote"
+        exit 1
+    fi
 }
 
 copy_dxram()
@@ -268,9 +287,8 @@ copy_dxram()
 
 depl_dxram()
 {
-    local remote="$1"
-    local mode="$2"  
-    local args=${@:3}
+    local mode="$1"  
+    local args=${@:2}
 
     cd $LOCAL_CDEPL_DIR
 
@@ -291,9 +309,8 @@ depl_dxram()
 
 depl_ycsb()
 {
-    local remote="$1"
-    local mode="$2"  
-    local args=${@:3}
+    local mode="$1"  
+    local args=${@:2}
 
     cd $LOCAL_CDEPL_DIR
 
@@ -312,30 +329,69 @@ depl_ycsb()
     esac
 }
 
-term()
+depl_dxnet()
 {
-    ${LOCAL_DXAPPS_DIR}/dxa-terminal/client/build/dist/client/bin/client ${@:1}
+    local mode="$1"  
+    local args=${@:2}
+
+    cd $LOCAL_CDEPL_DIR
+
+    case $mode in
+        run)
+            ./cdepl.sh scripts/dxnet_bench.cdepl $args
+            ;;
+
+        kill)
+            ./cdepl.sh scripts/dxnet_killall.cdepl $args
+            ;;
+        
+        *)
+            echo "Invalid mode: $mode"
+            exit 1
+    esac
+}
+
+term()
+{    
+    local remote="$1"
+    local port="$2"
+    local cluster="$3"
+    
+    case $cluster in
+        hhubs)
+            echo "Port forwarding over sollipulli active"
+            ssh -L 9999:localhost:9999 sollipulli ssh -L 9999:localhost:$port -N $remote &
+            local tunnel_pid=$!
+
+            ${LOCAL_DXAPPS_DIR}/dxa-terminal/client/build/dist/client/bin/client localhost 9999
+            kill $tunnel_pid
+            ;;
+        *)
+            ${LOCAL_DXAPPS_DIR}/dxa-terminal/client/build/dist/client/bin/client $remote $port
+    esac
 }
 
 depl()
 {
     local prog="$1"
-    local remote="$2"
-    local mode="$3"
 
-    echo "Deploying $prog to $remote..."
+    echo "Deploying $prog..."
 
     case $prog in
         dxram)
-            depl_dxram $remote $mode ${@:4}
+            depl_dxram ${@:2}
             ;;
 
         ycsb)
-            depl_ycsb $remote $mode ${@:4}
+            depl_ycsb ${@:2}
+            ;;
+
+        dxnet)
+            depl_dxnet ${@:2}
             ;;
 
         *)
-            echo "Invalid compile target: all, dxram, dxnet, dxmem, ycsb, dxapps"
+            echo "Invalid deply target: all, dxram, dxnet, dxmem, ycsb, dxapps"
             ;;
     esac
 }
@@ -378,7 +434,7 @@ copy()
             ;;
 
         *)
-            echo "Invalid compile target: all, dxram, dxnet, dxmem, ycsb, dxapps"
+            echo "Invalid copy target: all, dxram, dxnet, dxmem, ycsb, dxapps"
             ;;
     esac
 }
