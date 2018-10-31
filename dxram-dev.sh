@@ -7,6 +7,10 @@
 # HHUBS_USER="user"
 # HHUBS_HOST="sollipulli"
 # HHUBS_DIR="/home/user"
+# HILBERT_USER="user"
+# HILBERT_DIR="/home/user"
+
+readonly HILBERT_HOST="hpc.rz.uni-duesseldorf.de"
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
 
@@ -127,6 +131,75 @@ compile_ibdxnet()
         rsync -avz --delete CMakeLists.txt ${HHUBS_USER}@${node}:${HHUBS_DIR}/ibdxnet/CMakeLists.txt
 
         ssh ${HHUBS_USER}@${node} "cd ${HHUBS_DIR}/ibdxnet && ./build.sh $type"
+    elif [ "$remote" = "hilbert" ]; then
+        if [ ! "$node" ]; then
+            echo "Please specify the target architecture: ivybridge or skylake"
+            exit 1
+        fi
+
+        echo "Remote compiling hilbert for target arch $node..."
+        cd $LOCAL_IBDXNET_DIR
+
+        if [ "$clean" = "1" ]; then
+            ssh ${HILBERT_USER}@${HILBERT_HOST} "rm -r ${HILBERT_DIR}/ibdxnet"
+        fi
+
+        ssh ${HILBERT_USER}@${HILBERT_HOST} "mkdir -p ${HILBERT_DIR}/ibdxnet"
+        rsync -avz --delete cmake/ ${HILBERT_USER}@${HILBERT_HOST}:${HILBERT_DIR}/ibdxnet/cmake/
+        rsync -avz --delete libs/ ${HILBERT_USER}@${HILBERT_HOST}:${HILBERT_DIR}/ibdxnet/libs/
+        rsync -avz --delete src/ ${HILBERT_USER}@${HILBERT_HOST}:${HILBERT_DIR}/ibdxnet/src/
+        rsync -avz --delete build.sh ${HILBERT_USER}@${HILBERT_HOST}:${HILBERT_DIR}/ibdxnet/build.sh
+        rsync -avz --delete CMakeLists.txt ${HILBERT_USER}@${HILBERT_HOST}:${HILBERT_DIR}/ibdxnet/CMakeLists.txt
+
+        # create job script
+        local pbs_job_string="
+#!/bin/bash
+
+# job attributes
+#PBS -l select=1:ncpus=4:mem=4GB:arch=${node}
+#PBS -l place=scatter
+#PBS -l walltime=00:15:00
+#PBS -r n
+#PBS -N ibdxnet_cc
+#PBS -A dxram
+#PBS -e /home/${HILBERT_USER}/ibdxnet/compile.stderr
+#PBS -o /home/${HILBERT_USER}/ibdxnet/compile.stdout
+
+echo \"\$PBS_NODEFILE\"
+
+readonly SCRIPT_DIR=\"\$( cd \"\$(dirname \"\${BASH_SOURCE[0]}\")\" && pwd )\"
+
+module load gcc/6.1.0
+module load cmake/3.5.1
+module load Java/1.8.0
+
+cd ~/ibdxnet
+
+# Add further include paths if not already inserted
+# Required on hilbert environment with module system
+if [ ! \"\$(grep \"/software/java\" cmake/MsgrcJNIBinding/CMakeLists.txt)\" ]; then
+        sed -i -e 's/include_directories(\${IBNET_SRC_DIR})/include_directories(\${IBNET_SRC_DIR\})\ninclude_directories(\/software\/java\/1\.8\.0_25\/include)\ninclude_directories(\/software\/java\/1.8.0_25\/include\/linux)/g' cmake/MsgrcJNIBinding/CMakeLists.txt
+fi
+
+./build.sh
+"
+
+        echo "$pbs_job_string" > /tmp/ibdxnet_cc.job
+        scp /tmp/ibdxnet_cc.job ${HILBERT_USER}@${HILBERT_HOST}:/home/${HILBERT_USER}/ibdxnet/
+        ssh ${HILBERT_USER}@${HILBERT_HOST} "rm -f /home/${HILBERT_USER}/ibdxnet/compile.std*"
+        ssh ${HILBERT_USER}@${HILBERT_HOST} "qsub -q BenchMarking /home/${HILBERT_USER}/ibdxnet/ibdxnet_cc.job"
+
+        echo "Waiting for compile job to finish..."
+
+        while true; do
+            if [ $(ssh ${HILBERT_USER}@${HILBERT_HOST} "[ -f /home/${HILBERT_USER}/ibdxnet/compile.stdout ] && echo 1" = "1") ]; then
+                printf "\nFinished\n"
+                break
+            fi
+
+            sleep 1
+            printf "."
+        done
     else
         echo "Invalid remote $remote"
         exit 1
@@ -189,10 +262,21 @@ copy_dxapps()
             ssh ${HHUBS_USER}@${HHUBS_HOST} "rm ${HHUBS_DIR}/dxram/dxapps/*"
         fi
 
-        scp ${LOCAL_DXAPPS_DIR}/dxa-chunkbench/build/libs/dxa-chunkbench.jar ${HHUBS_USER}@${HHUBS_HOST}:${HHUBS_DIR}/dxram/dxapp/
-        scp ${LOCAL_DXAPPS_DIR}/dxa-helloworld/build/libs/dxa-helloworld.jar ${HHUBS_USER}@${HHUBS_HOST}:${HHUBS_DIR}/dxram/dxapp/
-        scp ${LOCAL_DXAPPS_DIR}/dxa-migration/build/libs/dxa-migration.jar ${HHUBS_USER}@${HHUBS_HOST}:${HHUBS_DIR}/dxram/dxapp/
-        scp ${LOCAL_DXAPPS_DIR}/dxa-terminal/server/build/libs/dxa-terminal.jar ${HHUBS_USER}@${HHUBS_HOST}:${HHUBS_DIR}/dxram/dxapp/
+        rsync -avz ${LOCAL_DXAPPS_DIR}/dxa-chunkbench/build/libs/dxa-chunkbench.jar ${HHUBS_USER}@${HHUBS_HOST}:${HHUBS_DIR}/dxram/dxapp/
+        rsync -avz ${LOCAL_DXAPPS_DIR}/dxa-helloworld/build/libs/dxa-helloworld.jar ${HHUBS_USER}@${HHUBS_HOST}:${HHUBS_DIR}/dxram/dxapp/
+        rsync -avz ${LOCAL_DXAPPS_DIR}/dxa-migration/build/libs/dxa-migration.jar ${HHUBS_USER}@${HHUBS_HOST}:${HHUBS_DIR}/dxram/dxapp/
+        rsync -avz ${LOCAL_DXAPPS_DIR}/dxa-terminal/server/build/libs/dxa-terminal.jar ${HHUBS_USER}@${HHUBS_HOST}:${HHUBS_DIR}/dxram/dxapp/
+    elif [ "$remote" = "hilbert" ]; then
+        cd $LOCAL_DXAPPS_DIR
+
+        if [ "$clean" ]; then
+            ssh ${HILBERT_USER}@${HILBERT_HOST} "rm ${HILBERT_DIR}/dxram/dxapps/*"
+        fi
+
+        rsync -avz ${LOCAL_DXAPPS_DIR}/dxa-chunkbench/build/libs/dxa-chunkbench.jar ${HILBERT_USER}@${HILBERT_HOST}:${HILBERT_DIR}/dxram/dxapp/
+        rsync -avz ${LOCAL_DXAPPS_DIR}/dxa-helloworld/build/libs/dxa-helloworld.jar ${HILBERT_USER}@${HILBERT_HOST}:${HILBERT_DIR}/dxram/dxapp/
+        rsync -avz ${LOCAL_DXAPPS_DIR}/dxa-migration/build/libs/dxa-migration.jar ${HILBERT_USER}@${HILBERT_HOST}:${HILBERT_DIR}/dxram/dxapp/
+        rsync -avz ${LOCAL_DXAPPS_DIR}/dxa-terminal/server/build/libs/dxa-terminal.jar ${HILBERT_USER}@${HILBERT_HOST}:${HILBERT_DIR}/dxram/dxapp/
     else
         echo "Invalid remote: $remote"
         exit 1
@@ -211,9 +295,9 @@ copy_ycsb()
 
         # ycsb build output
         cd ${LOCAL_DXRAM_YCSB}/dxram/target/
-        tar -xzvf ycsb-dxram-binding-0.13.0-SNAPSHOT.tar.gz
-        rsync -avz ${LOCAL_DXRAM_YCSB}/dxram/target/ycsb-dxram-binding-0.13.0-SNAPSHOT/ ${HHUBS_USER}@${HHUBS_HOST}:${HHUBS_DIR}/ycsb-dxram/
-        rm -r ycsb-dxram-binding-0.13.0-SNAPSHOT
+        tar -xzvf ycsb-dxram-binding-0.14.0.tar.gz
+        rsync -avz ${LOCAL_DXRAM_YCSB}/dxram/target/ycsb-dxram-binding-0.14.0/ ${HHUBS_USER}@${HHUBS_HOST}:${HHUBS_DIR}/ycsb-dxram/
+        rm -r ycsb-dxram-binding-0.14.0
 
         # copy dxram to ycsb-dxram folder
         rsync -avz ${DXRAM_DIST_DIR}/ ${HHUBS_USER}@${HHUBS_HOST}:${HHUBS_DIR}/ycsb-dxram/
@@ -222,6 +306,25 @@ copy_ycsb()
         if [ "$(ssh ${HHUBS_USER}@${HHUBS_HOST} "[ -d ${HHUBS_DIR}/ibdxnet/build ] && echo \"1\"")" ]; then
             echo "Found compiled ibdxnet lib, copying to dxram jni folder..."
             ssh ${HHUBS_USER}@${HHUBS_HOST} "cp ${HHUBS_DIR}/ibdxnet/build/lib/libMsgrcJNIBinding.so ${HHUBS_DIR}/ycsb-dxram/jni/"
+        fi
+    elif [ "$remote" = "hilbert" ]; then
+        if [ "$clean" ]; then
+            ssh ${HILBERT_USER}@${HILBERT_HOST} "rm -r ${HILBERT_DIR}/ycsb-dxram"
+        fi
+
+        # ycsb build output
+        cd ${LOCAL_DXRAM_YCSB}/dxram/target/
+        tar -xzvf ycsb-dxram-binding-0.14.0.tar.gz
+        rsync -avz ${LOCAL_DXRAM_YCSB}/dxram/target/ycsb-dxram-binding-0.14.0/ ${HILBERT_USER}@${HILBERT_HOST}:${HILBERT_DIR}/ycsb-dxram/
+        rm -r ycsb-dxram-binding-0.14.0
+
+        # copy dxram to ycsb-dxram folder
+        rsync -avz ${DXRAM_DIST_DIR}/ ${HILBERT_USER}@${HILBERT_HOST}:${HILBERT_DIR}/ycsb-dxram/
+
+        # check if ibdxnet is available and copy
+        if [ "$(ssh ${HILBERT_USER}@${HILBERT_HOST} "[ -d ${HILBERT_DIR}/ibdxnet/build ] && echo \"1\"")" ]; then
+            echo "Found compiled ibdxnet lib, copying to dxram jni folder..."
+            ssh ${HILBERT_USER}@${HILBERT_HOST} "cp ${HILBERT_DIR}/ibdxnet/build/lib/libMsgrcJNIBinding.so ${HILBERT_DIR}/ycsb-dxram/jni/"
         fi
     else
         echo "Invalid remote: $remote"
@@ -254,6 +357,20 @@ copy_dxnet()
             echo "Found compiled ibdxnet lib, copying to dxram jni folder..."
             ssh ${HHUBS_USER}@${HHUBS_HOST} "cp ${HHUBS_DIR}/ibdxnet/build/lib/libMsgrcJNIBinding.so ${HHUBS_DIR}/dxnet/jni/"
         fi
+    elif [ "$remote" = "hilbert" ]; then
+        cd $LOCAL_DXNET_DIR
+
+        if [ "$clean" ]; then
+            ssh ${HILBERT_USER}@${HILBERT_HOST} "rm -r ${HILBERT_DIR}/dxnet"
+        fi
+
+        rsync -avz build/dist/dxnet/ ${HILBERT_USER}@${HILBERT_HOST}:${HILBERT_DIR}/dxnet/
+
+        # check if ibdxnet is available and copy
+        if [ "$(ssh ${HILBERT_USER}@${HILBERT_HOST} "[ -d ${HILBERT_DIR}/ibdxnet/build ] && echo \"1\"")" ]; then
+            echo "Found compiled ibdxnet lib, copying to dxram jni folder..."
+            ssh ${HILBERT_USER}@${HILBERT_HOST} "cp ${HILBERT_DIR}/ibdxnet/build/lib/libMsgrcJNIBinding.so ${HILBERT_DIR}/dxnet/jni/"
+        fi
     else
         echo "Invalid remote: $remote"
         exit 1
@@ -278,6 +395,20 @@ copy_dxram()
         if [ "$(ssh ${HHUBS_USER}@${HHUBS_HOST} "[ -d ${HHUBS_DIR}/ibdxnet/build ] && echo \"1\"")" ]; then
             echo "Found compiled ibdxnet lib, copying to dxram jni folder..."
             ssh ${HHUBS_USER}@${HHUBS_HOST} "cp ${HHUBS_DIR}/ibdxnet/build/lib/libMsgrcJNIBinding.so ${HHUBS_DIR}/dxram/jni/"
+        fi
+    elif [ "$remote" = "hilbert" ]; then
+        cd $LOCAL_DXRAM_DIR
+
+        if [ "$clean" ]; then
+            ssh ${HILBERT_USER}@${HILBERT_HOST} "rm -r ${HILBERT_DIR}/dxram"
+        fi
+
+        rsync -avz ${DXRAM_DIST_DIR}/ ${HILBERT_USER}@${HILBERT_HOST}:${HILBERT_DIR}/dxram/
+
+        # check if ibdxnet is available and copy
+        if [ "$(ssh ${HILBERT_USER}@${HILBERT_HOST} "[ -d ${HILBERT_DIR}/ibdxnet/build ] && echo \"1\"")" ]; then
+            echo "Found compiled ibdxnet lib, copying to dxram jni folder..."
+            ssh ${HILBERT_USER}@${HILBERT_HOST} "cp ${HILBERT_DIR}/ibdxnet/build/lib/libMsgrcJNIBinding.so ${HILBERT_DIR}/dxram/jni/"
         fi
     else
         echo "Invalid remote: $remote"
@@ -360,11 +491,11 @@ term()
     case $cluster in
         hhubs)
             echo "Port forwarding over sollipulli active"
-            ssh -L 9999:localhost:9999 sollipulli ssh -L 9999:localhost:$port -N $remote &
+            ssh -L 9998:localhost:9998 sollipulli ssh -L 9998:localhost:$port -N $remote &
             local tunnel_pid=$!
 
-            ${LOCAL_DXAPPS_DIR}/dxa-terminal/client/build/dist/client/bin/client localhost 9999
-            kill $tunnel_pid
+            ${LOCAL_DXAPPS_DIR}/dxa-terminal/client/build/dist/client/bin/client localhost 9998
+            kill -9 $tunnel_pid
             ;;
         *)
             ${LOCAL_DXAPPS_DIR}/dxa-terminal/client/build/dist/client/bin/client $remote $port
