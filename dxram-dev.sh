@@ -264,7 +264,7 @@ copy_dxapps()
 
         rsync -avz ${LOCAL_DXAPPS_DIR}/dxa-chunkbench/build/libs/dxa-chunkbench.jar ${HHUBS_USER}@${HHUBS_HOST}:${HHUBS_DIR}/dxram/dxapp/
         rsync -avz ${LOCAL_DXAPPS_DIR}/dxa-helloworld/build/libs/dxa-helloworld.jar ${HHUBS_USER}@${HHUBS_HOST}:${HHUBS_DIR}/dxram/dxapp/
-        rsync -avz ${LOCAL_DXAPPS_DIR}/dxa-migration/build/libs/dxa-migration.jar ${HHUBS_USER}@${HHUBS_HOST}:${HHUBS_DIR}/dxram/dxapp/
+        # rsync -avz ${LOCAL_DXAPPS_DIR}/dxa-migration/build/libs/dxa-migration.jar ${HHUBS_USER}@${HHUBS_HOST}:${HHUBS_DIR}/dxram/dxapp/
         rsync -avz ${LOCAL_DXAPPS_DIR}/dxa-terminal/server/build/libs/dxa-terminal.jar ${HHUBS_USER}@${HHUBS_HOST}:${HHUBS_DIR}/dxram/dxapp/
     elif [ "$remote" = "hilbert" ]; then
         cd $LOCAL_DXAPPS_DIR
@@ -275,7 +275,7 @@ copy_dxapps()
 
         rsync -avz ${LOCAL_DXAPPS_DIR}/dxa-chunkbench/build/libs/dxa-chunkbench.jar ${HILBERT_USER}@${HILBERT_HOST}:${HILBERT_DIR}/dxram/dxapp/
         rsync -avz ${LOCAL_DXAPPS_DIR}/dxa-helloworld/build/libs/dxa-helloworld.jar ${HILBERT_USER}@${HILBERT_HOST}:${HILBERT_DIR}/dxram/dxapp/
-        rsync -avz ${LOCAL_DXAPPS_DIR}/dxa-migration/build/libs/dxa-migration.jar ${HILBERT_USER}@${HILBERT_HOST}:${HILBERT_DIR}/dxram/dxapp/
+        # rsync -avz ${LOCAL_DXAPPS_DIR}/dxa-migration/build/libs/dxa-migration.jar ${HILBERT_USER}@${HILBERT_HOST}:${HILBERT_DIR}/dxram/dxapp/
         rsync -avz ${LOCAL_DXAPPS_DIR}/dxa-terminal/server/build/libs/dxa-terminal.jar ${HILBERT_USER}@${HILBERT_HOST}:${HILBERT_DIR}/dxram/dxapp/
     else
         echo "Invalid remote: $remote"
