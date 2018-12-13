@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# DX Project Manager
+# ------------------
+#
 # Create a configuration file with the following contents in the comments and adjust the parameters
 #
 # NAME="Octo Cat"
@@ -7,20 +10,45 @@
 # GITHUB_USER="octocat"
 # REMOTE_ORIGIN="origin"
 # REMOTE_SHARED="bsinfo"
+# DXRAM_WORKSPACE_DIR="/absolute/path/to/workspace"
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
-
+CONFIG_FILE=${SCRIPT_DIR}/hhubs-git.conf
 DXRAM_WORKSPACE_DIR="${SCRIPT_DIR}/.."
+
+readonly CONFIG_KEYS=("NAME" "EMAIL" "GITHUB_USER" "REMOTE_ORIGIN" "REMOTE_SHARED" "DXRAM_WORKSPACE_DIR")
+readonly CONFIG_PROMPTS=("Please specify your full name:" "Please specify your email address:" "Please specify your Github username:" "Please specifiy your private remote's name:" "Pleasy specify your shared remote's name:" "Please specify your workspace directory:")
+
+read_config_data()
+{
+	local key=$1
+	local prompt=$2
+	
+	printf "${prompt} "
+	read input
+	echo "${key}=\"${input}\"" >> ${CONFIG_FILE}
+}
 
 # Abort on any errors
 set -e
+
+# Check if configuration file already exists
+if [[ ! -f ${CONFIG_FILE} ]]; then
+	# Create configuration file
+	touch ${SCRIPT_DIR}/hhubs-git.conf
+
+	# Read configuration file data
+	for i in "${!CONFIG_KEYS[@]}"; do
+		read_config_data "${CONFIG_KEYS[$i]}" "${CONFIG_PROMPTS[$i]}"
+	done
+fi
 
 source ${SCRIPT_DIR}/hhubs-git.conf
 
 readonly GITHUB_SHARED="git@github.com:hhu-bsinfo"
 readonly GITHUB_ORIGIN="git@github.com:$GITHUB_USER"
 
-readonly REPOSITORIES=("cdepl" "dxbuild" "dxlog" "dxmem" "dxmon" "dxnet" "dxram" "dxutils" "ibdxnet")
+readonly REPOSITORIES=("cdepl" "dxbuild" "dxlog" "dxmem" "dxmon" "dxnet" "dxram" "dxutils" "ibdxnet" "dxapps")
 
 clone_and_setup_repository()
 {
@@ -31,15 +59,12 @@ clone_and_setup_repository()
         return
     fi
 
-    git clone $GITHUB_SHARED/$repo_name
-    cd $repo_name
-    git config user.name "$NAME"
-    git config user.email "$EMAIL"
-    git remote rename origin $REMOTE_SHARED
-    git remote add $REMOTE_ORIGIN $GITHUB_ORIGIN/$repo_name
-    git fetch $REMOTE_ORIGIN
-    git checkout -b development $REMOTE_SHARED/development
-    cd ..
+    git clone --depth 50 --no-single-branch $GITHUB_SHARED/$repo_name ${DXRAM_WORKSPACE_DIR}/$repo_name
+    git -C ${DXRAM_WORKSPACE_DIR}/$repo_name config user.name "$NAME"
+    git -C ${DXRAM_WORKSPACE_DIR}/$repo_name config user.email "$EMAIL"
+    git -C ${DXRAM_WORKSPACE_DIR}/$repo_name remote rename origin $REMOTE_SHARED
+    git -C ${DXRAM_WORKSPACE_DIR}/$repo_name remote add $REMOTE_ORIGIN $GITHUB_ORIGIN/$repo_name
+    git -C ${DXRAM_WORKSPACE_DIR}/$repo_name checkout -b development $REMOTE_SHARED/development
 }
 
 checkout_branch_repository()
@@ -47,8 +72,7 @@ checkout_branch_repository()
     local repo_name=$1
     local branch=$2
 
-    cd ${DXRAM_WORKSPACE_DIR}/$repo_name
-    git checkout $branch
+    git -C ${DXRAM_WORKSPACE_DIR}/$repo_name checkout $branch
 }
 
 fetch_and_rebase_hhubs()
@@ -57,18 +81,17 @@ fetch_and_rebase_hhubs()
     local remote_name=$2
     local branch_name=$3
 
-    cd ${DXRAM_WORKSPACE_DIR}/$repo_name
-    git fetch $remote_name
+    git -C ${DXRAM_WORKSPACE_DIR}/$repo_name fetch $remote_name
 
     set +e
     # Check if branch exists
-    git rev-parse --verify $branch_name > /dev/null
+    git -C ${DXRAM_WORKSPACE_DIR}/$repo_name rev-parse --verify $branch_name > /dev/null
 
     if [ "$?" = "0" ]; then
         set -e
         echo "$branch_name branch..."
-        git checkout $branch_name
-        git rebase $remote_name/$branch_name
+        git -C ${DXRAM_WORKSPACE_DIR}/$repo_name checkout $branch_name
+        git -C ${DXRAM_WORKSPACE_DIR}/$repo_name rebase $remote_name/$branch_name
     fi
 
     set -e
@@ -80,20 +103,30 @@ push_to_remote()
     local remote_name=$2
     local branch_name=$3
 
-    cd ${DXRAM_WORKSPACE_DIR}/$repo_name
-
     set +e
     # Check if branch exists
-    git rev-parse --verify $branch_name > /dev/null
+    git -C ${DXRAM_WORKSPACE_DIR}/$repo_name rev-parse --verify $branch_name > /dev/null
 
     if [ "$?" = "0" ]; then
         set -e
         echo "$branch_name branch..."
-        git checkout $branch_name
-        git push $remote_name HEAD:$branch_name
+        git -C ${DXRAM_WORKSPACE_DIR}/$repo_name checkout $branch_name
+        git -C ${DXRAM_WORKSPACE_DIR}/$repo_name push $remote_name HEAD:$branch_name
     fi
 
     set -e
+}
+
+get_repositories()
+{
+	local repo_list="$*"
+	
+	if [[ -z ${repo_list} ]]; then
+        echo "${REPOSITORIES[@]}"
+        return 0
+    fi
+    
+    echo "${repo_list}"
 }
 
 if [ ! "$1" ]; then
@@ -102,9 +135,9 @@ if [ ! "$1" ]; then
     exit -1
 fi
 
-case $1 in
+case $1 in  
     clone)
-        for repo in "${REPOSITORIES[@]}"; do
+        for repo in $(get_repositories ${@:2}); do
             echo ">>> Cloning $repo..."
             if [ -d "$repo" ]; then
                 echo "Already exists, skipping"
@@ -121,7 +154,7 @@ case $1 in
             exit -1
         fi
 
-        for repo in "${REPOSITORIES[@]}"; do
+        for repo in $(get_repositories ${@:3}); do
             echo ">>> Branch switch $repo..."
             checkout_branch_repository $repo $2
         done
@@ -134,7 +167,7 @@ case $1 in
             exit -1
         fi
 
-        for repo in "${REPOSITORIES[@]}"; do
+        for repo in $(get_repositories ${@:3}); do
             echo ">>> Pull $repo from $2..."
             fetch_and_rebase_hhubs $repo $2 master
             fetch_and_rebase_hhubs $repo $2 development
@@ -148,7 +181,7 @@ case $1 in
             exit -1
         fi
 
-        for repo in "${REPOSITORIES[@]}"; do
+        for repo in $(get_repositories ${@:3}); do
             echo ">>> Pushing $repo to $2..."
             push_to_remote $repo $2 master
             push_to_remote $repo $2 development
