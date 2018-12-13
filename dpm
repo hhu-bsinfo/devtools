@@ -2,18 +2,9 @@
 
 # DX Project Manager
 # ------------------
-#
-# Create a configuration file with the following contents in the comments and adjust the parameters
-#
-# NAME="Octo Cat"
-# EMAIL="octocat@github.com"
-# GITHUB_USER="octocat"
-# REMOTE_ORIGIN="origin"
-# REMOTE_SHARED="bsinfo"
-# DXRAM_WORKSPACE_DIR="/absolute/path/to/workspace"
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
-CONFIG_FILE=${SCRIPT_DIR}/hhubs-git.conf
+CONFIG_FILE="/home/$USER/.dpm"
 DXRAM_WORKSPACE_DIR="${SCRIPT_DIR}/.."
 
 readonly CONFIG_KEYS=("NAME" "EMAIL" "GITHUB_USER" "REMOTE_ORIGIN" "REMOTE_SHARED" "DXRAM_WORKSPACE_DIR")
@@ -35,7 +26,7 @@ set -e
 # Check if configuration file already exists
 if [[ ! -f ${CONFIG_FILE} ]]; then
 	# Create configuration file
-	touch ${SCRIPT_DIR}/hhubs-git.conf
+	touch ${CONFIG_FILE}
 
 	# Read configuration file data
 	for i in "${!CONFIG_KEYS[@]}"; do
@@ -43,7 +34,7 @@ if [[ ! -f ${CONFIG_FILE} ]]; then
 	done
 fi
 
-source ${SCRIPT_DIR}/hhubs-git.conf
+source "${CONFIG_FILE}"
 
 readonly GITHUB_SHARED="git@github.com:hhu-bsinfo"
 readonly GITHUB_ORIGIN="git@github.com:$GITHUB_USER"
