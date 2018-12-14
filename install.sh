@@ -30,6 +30,15 @@ install()
 	echo "  |                                                                           |"
 	echo "  -----------------------------------------------------------------------------"
 	echo ""
+	
+	read -p ":: add line to .bashrc now? [y|N] " -n 1 -r
+	if [[ $REPLY =~ ^[Yy]$ ]]; then
+		echo "" >> "${HOME}/.bashrc"
+		echo "# DX Project Manager" >> "${HOME}/.bashrc"
+		echo "export PATH=\"\$PATH:${INSTALL_DIR}\"" >> "${HOME}/.bashrc"
+	fi
+	
+	echo ""
 }
 
 
