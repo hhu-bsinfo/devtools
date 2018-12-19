@@ -1,6 +1,6 @@
 #!/bin/bash
 
-INSTALL_DIR="$HOME/.dpm"
+INSTALL_DIR="$HOME/.dru"
 
 set -e
 
@@ -19,7 +19,7 @@ install()
 	git clone git@github.com:hhu-bsinfo/dxdevtools.git "${INSTALL_DIR}" --quiet
 	
 	echo ":: setting execute permissions"
-	chmod +x "${INSTALL_DIR}/dpm"
+	chmod +x "${INSTALL_DIR}/dru"
 
 	echo ""
 	echo "  -----------------------------------------------------------------------------"
