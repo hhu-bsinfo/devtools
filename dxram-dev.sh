@@ -23,7 +23,7 @@ LOCAL_DXRAM_DIR="${LOCAL_DXRAM_WORKSPACE}/dxram"
 LOCAL_DXNET_DIR="${LOCAL_DXRAM_WORKSPACE}/dxnet"
 LOCAL_IBDXNET_DIR="${LOCAL_DXRAM_WORKSPACE}/ibdxnet"
 LOCAL_DXMEM_DIR="${LOCAL_DXRAM_WORKSPACE}/dxmem"
-LOCAL_DXRAM_YCSB="${LOCAL_DXRAM_WORKSPACE}/ycsb-dxram"
+LOCAL_DXRAM_YCSB="${LOCAL_DXRAM_WORKSPACE}/YCSB"
 LOCAL_DXAPPS_DIR="${LOCAL_DXRAM_WORKSPACE}/dxapps"
 LOCAL_CDEPL_DIR="${LOCAL_DXRAM_WORKSPACE}/cdepl"
 
@@ -67,10 +67,10 @@ compile_ycsb()
         mvn clean
     fi
     
-    rm -r dxram/lib
+    rm -rf dxram/lib
     cp -r "${DXRAM_DIST_DIR}/lib" dxram/lib
     
-    mvn install package -DskipTests
+    mvn -pl com.yahoo.ycsb:dxram-binding -am clean package -DskipTests
 }
 
 compile_dxmem()
@@ -285,6 +285,8 @@ copy_dxapps()
 
 copy_ycsb()
 {
+    local package_filename="ycsb-dxram-binding-0.16.0-SNAPSHOT"
+
     local remote="$1"
     local clean="$2"
 
@@ -295,9 +297,9 @@ copy_ycsb()
 
         # ycsb build output
         cd ${LOCAL_DXRAM_YCSB}/dxram/target/
-        tar -xzvf ycsb-dxram-binding-0.14.0.tar.gz
-        rsync -avz ${LOCAL_DXRAM_YCSB}/dxram/target/ycsb-dxram-binding-0.14.0/ ${HHUBS_USER}@${HHUBS_HOST}:${HHUBS_DIR}/ycsb-dxram/
-        rm -r ycsb-dxram-binding-0.14.0
+        tar -xzvf ${package_filename}.tar.gz
+        rsync -avz ${LOCAL_DXRAM_YCSB}/dxram/target/${package_filename}/ ${HHUBS_USER}@${HHUBS_HOST}:${HHUBS_DIR}/ycsb-dxram/
+        rm -r ${package_filename}
 
         # copy dxram to ycsb-dxram folder
         rsync -avz ${DXRAM_DIST_DIR}/ ${HHUBS_USER}@${HHUBS_HOST}:${HHUBS_DIR}/ycsb-dxram/
@@ -314,9 +316,9 @@ copy_ycsb()
 
         # ycsb build output
         cd ${LOCAL_DXRAM_YCSB}/dxram/target/
-        tar -xzvf ycsb-dxram-binding-0.14.0.tar.gz
-        rsync -avz ${LOCAL_DXRAM_YCSB}/dxram/target/ycsb-dxram-binding-0.14.0/ ${HILBERT_USER}@${HILBERT_HOST}:${HILBERT_DIR}/ycsb-dxram/
-        rm -r ycsb-dxram-binding-0.14.0
+        tar -xzvf ${package_filename}.tar.gz
+        rsync -avz ${LOCAL_DXRAM_YCSB}/dxram/target/${package_filename}/ ${HILBERT_USER}@${HILBERT_HOST}:${HILBERT_DIR}/ycsb-dxram/
+        rm -r ${package_filename}
 
         # copy dxram to ycsb-dxram folder
         rsync -avz ${DXRAM_DIST_DIR}/ ${HILBERT_USER}@${HILBERT_HOST}:${HILBERT_DIR}/ycsb-dxram/
