@@ -7,7 +7,7 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
 CONFIG_FILE="${HOME}/.dru/.config"
 
 readonly CONFIG_KEYS=("NAME" "EMAIL" "GITHUB_USER" "REMOTE_ORIGIN" "REMOTE_SHARED" "DXRAM_WORKSPACE_DIR")
-readonly CONFIG_PROMPTS=("Please specify your full name:" "Please specify your email address:" "Please specify your Github username:" "Please specifiy your private remote's name:" "Pleasy specify your shared remote's name:" "Please specify your workspace directory:")
+readonly CONFIG_PROMPTS=("Please specify your full name:" "Please specify your email address:" "Please specify your Github username:" "Please specifiy your private git remote's name (e.g. origin):" "Pleasy specify your shared git remote's name (e.g. bsinfo):" "Please specify your workspace directory where the repositories (e.g. dxram, dxnet, dxmem etc.) are (going to be) located (e.g. /home/user/dxworkspace):")
 
 read_config_data()
 {
@@ -25,6 +25,7 @@ set -e
 # Check if configuration file already exists
 if [[ ! -f ${CONFIG_FILE} ]]; then
 	# Create configuration file
+	echo "No configuration file exists, creating new one"
 	touch ${CONFIG_FILE}
 
 	# Read configuration file data
